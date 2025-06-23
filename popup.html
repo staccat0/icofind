@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>网站图标提取器 - 专业版</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        body {
+            width: 400px;
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            color: #fff;
+            padding: 20px;
+            min-height: 480px;
+            overflow-x: hidden;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.8;
+            margin-top: 5px;
+        }
+
+        .status-indicator {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: #4CAF50;
+            box-shadow: 0 0 8px #4CAF50;
+        }
+
+        .icon-display {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .favicon-container {
+            width: 140px;
+            height: 140px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .favicon {
+            width: 80px;
+            height: 80px;
+            object-fit: contain;
+            border-radius: 12px;
+        }
+
+        .no-icon {
+            font-size: 48px;
+            color: rgba(255, 255, 255, 0.2);
+        }
+
+        .site-info {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 14px;
+            padding: 15px;
+            width: 100%;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        .site-info h2 {
+            font-size: 18px;
+            margin-bottom: 8px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .site-info p {
+            font-size: 14px;
+            opacity: 0.8;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .btn {
+            padding: 12px;
+            border: none;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.25);
+            transform: translateY(-2px);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #00c6ff, #0072ff);
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #00b4e6, #0066cc);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #56ab2f, #a8e063);
+        }
+
+        .btn-success:hover {
+            background: linear-gradient(135deg, #4d9929, #97d15a);
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #ff8c00, #ff2d55);
+        }
+
+        .btn-warning:hover {
+            background: linear-gradient(135deg, #e67e00, #e62a4d);
+        }
+
+        .history {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        .history h3 {
+            font-size: 16px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .history-icons {
+            display: flex;
+            gap: 12px;
+            overflow-x: auto;
+            padding: 5px 0 15px;
+        }
+
+        .history-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            object-fit: contain;
+            background: rgba(255, 255, 255, 0.08);
+            padding: 5px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        .history-icon:hover {
+            transform: scale(1.1);
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .footer {
+            text-align: center;
+            font-size: 12px;
+            opacity: 0.7;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.15);
+            margin-top: 10px;
+        }
+
+        .icon-size {
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px 0;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            border-top: 4px solid #00c6ff;
+            animation: spin 1s linear infinite;
+            margin-bottom: 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .icon-source {
+            margin-top: 8px;
+            font-size: 12px;
+            opacity: 0.7;
+        }
+
+        .error-box {
+            background: rgba(255, 87, 87, 0.15);
+            border: 1px solid rgba(255, 87, 87, 0.3);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .error-box h3 {
+            color: #ff5757;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .troubleshoot-btn {
+            margin-top: 10px;
+            background: rgba(255, 87, 87, 0.3);
+        }
+
+        .troubleshoot-btn:hover {
+            background: rgba(255, 87, 87, 0.4);
+        }
+
+        .icon-preview {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .preview-content {
+            background: #1e293b;
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            max-width: 90%;
+        }
+
+        .preview-content img {
+            max-width: 200px;
+            max-height: 200px;
+            margin: 15px 0;
+        }
+
+        .close-preview {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .icon-info {
+            margin-top: 10px;
+            font-size: 14px;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="status-indicator" id="statusIndicator"></div>
+        <h1><i class="fas fa-search"></i> 网站图标提取器</h1>
+        <p>直接从网页源代码中提取网站图标</p>
+    </div>
+
+    <div id="errorContainer" class="error-box" style="display: none;">
+        <h3><i class="fas fa-exclamation-triangle"></i> 图标提取失败</h3>
+        <p id="errorMessage">无法提取当前网站的图标，请尝试以下解决方案</p>
+        <button id="troubleshootBtn" class="btn troubleshoot-btn">
+            <i class="fas fa-wrench"></i> 尝试解决方案
+        </button>
+    </div>
+
+    <div class="icon-display">
+        <div class="favicon-container">
+            <div id="loading" class="loading">
+                <div class="spinner"></div>
+                <div>正在提取图标...</div>
+            </div>
+            <img id="favicon" class="favicon" src="" alt="网站图标" style="display: none;">
+            <i id="no-icon" class="fas fa-image no-icon" style="display: none;"></i>
+            <div id="icon-size" class="icon-size"></div>
+        </div>
+        <div class="site-info">
+            <h2 id="site-title">正在获取网站信息...</h2>
+            <p id="site-url">example.com</p>
+            <p id="icon-source" class="icon-source"></p>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button id="downloadBtn" class="btn btn-primary">
+            <i class="fas fa-download"></i> 下载图标
+        </button>
+        <button id="viewSourceBtn" class="btn btn-success">
+            <i class="fas fa-code"></i> 查看源码
+        </button>
+        <button id="previewBtn" class="btn btn-warning" style="grid-column: span 2;">
+            <i class="fas fa-expand"></i> 预览图标
+        </button>
+    </div>
+
+    <div class="history">
+        <h3><i class="fas fa-history"></i> 最近提取 <span id="historyCount">(0)</span></h3>
+        <div id="history-icons" class="history-icons">
+            <!-- 历史记录将通过JS动态添加 -->
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>网站图标提取器 v1.4 | CSP安全版</p>
+    </div>
+
+    <div id="iconPreview" class="icon-preview">
+        <button class="close-preview">&times;</button>
+        <div class="preview-content">
+            <h3>图标预览</h3>
+            <img id="previewImage" src="" alt="图标预览">
+            <div class="icon-info">
+                <p id="previewDomain">example.com</p>
+                <p id="previewSize">尺寸: 未知</p>
+            </div>
+            <button id="downloadPreviewBtn" class="btn btn-primary" style="margin-top: 15px;">
+                <i class="fas fa-download"></i> 下载图标
+            </button>
+        </div>
+    </div>
+
+    <!-- 外部脚本引用 -->
+    <script src="popup.js"></script>
+</body>
+</html>
