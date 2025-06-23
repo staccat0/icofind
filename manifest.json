@@ -1,24 +1,24 @@
 {
   "manifest_version": 3,
-  "name": "网站图标提取器 - 专业版",
+  "name": "icofind",
   "version": "1.4",
-  "description": "直接从网页源代码中提取网站图标，支持多种图标来源和MD5校验",
+  "description": "提取当前站点ico图标，生成hunter的ico指纹",
   "permissions": ["activeTab", "scripting", "storage"],
   "host_permissions": ["<all_urls>"],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
-      "16": "icons/icon16.png",
-      "32": "icons/icon32.png",
-      "48": "icons/icon48.png",
-      "128": "icons/icon128.png"
+      "16": "icons/icon16.jpg",
+      "32": "icons/icon32.jpg",
+      "48": "icons/icon48.jpg",
+      "128": "icons/icon128.jpg"
     }
   },
   "icons": {
-    "16": "icons/icon16.png",
-    "32": "icons/icon32.png",
-    "48": "icons/icon48.png",
-    "128": "icons/icon128.png"
+    "16": "icons/icon16.jpg",
+    "32": "icons/icon32.jpg",
+    "48": "icons/icon48.jpg",
+    "128": "icons/icon128.jpg"
   },
   "content_scripts": [
     {
