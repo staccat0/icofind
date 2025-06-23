@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>网站图标提取器 - 专业版</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="spark-md5.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -116,10 +117,16 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
+        
+        .icon-md5 {
+            font-size: 12px;
+            word-break: break-all;
+            margin-top: 5px;
+        }
 
         .controls {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1fr 1fr 1fr;
             gap: 10px;
             margin-bottom: 15px;
         }
@@ -172,6 +179,14 @@
 
         .btn-warning:hover {
             background: linear-gradient(135deg, #e67e00, #e62a4d);
+        }
+        
+        .btn-info {
+            background: linear-gradient(135deg, #5c67f2, #8e44ad);
+        }
+        
+        .btn-info:hover {
+            background: linear-gradient(135deg, #4a54e1, #7d3c98);
         }
 
         .history {
@@ -364,6 +379,7 @@
             <h2 id="site-title">正在获取网站信息...</h2>
             <p id="site-url">example.com</p>
             <p id="icon-source" class="icon-source"></p>
+            <p id="icon-md5" class="icon-md5"></p>
         </div>
     </div>
 
@@ -371,10 +387,14 @@
         <button id="downloadBtn" class="btn btn-primary">
             <i class="fas fa-download"></i> 下载图标
         </button>
+        <button id="copyMd5Btn" class="btn btn-info">
+            <i class="fas fa-copy"></i> copy hunter
+        </button>
         <button id="viewSourceBtn" class="btn btn-success">
             <i class="fas fa-code"></i> 查看源码
         </button>
-        <button id="previewBtn" class="btn btn-warning" style="grid-column: span 2;">
+
+        <button id="previewBtn" class="btn btn-warning" style="grid-column: span 3;">
             <i class="fas fa-expand"></i> 预览图标
         </button>
     </div>
@@ -387,7 +407,7 @@
     </div>
 
     <div class="footer">
-        <p>网站图标提取器 v1.4 | CSP安全版</p>
+        <p>网站图标提取器 v1.4 | MD5校验版</p>
     </div>
 
     <div id="iconPreview" class="icon-preview">
@@ -398,6 +418,7 @@
             <div class="icon-info">
                 <p id="previewDomain">example.com</p>
                 <p id="previewSize">尺寸: 未知</p>
+                <p id="previewMd5"></p>
             </div>
             <button id="downloadPreviewBtn" class="btn btn-primary" style="margin-top: 15px;">
                 <i class="fas fa-download"></i> 下载图标

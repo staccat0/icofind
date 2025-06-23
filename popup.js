@@ -45,14 +45,16 @@ async function getCurrentSiteInfo() {
 }
 
 // 显示图标
-function displayFavicon(url, sizeInfo, source) {
+async function displayFavicon(url, sizeInfo, source) {
     const loading = document.getElementById('loading');
     const favicon = document.getElementById('favicon');
     const noIcon = document.getElementById('no-icon');
     const sizeDisplay = document.getElementById('icon-size');
     const sourceDisplay = document.getElementById('icon-source');
+    const md5Display = document.getElementById('icon-md5');
     const previewImage = document.getElementById('previewImage');
     const previewSize = document.getElementById('previewSize');
+    const previewMd5 = document.getElementById('previewMd5');
     
     loading.style.display = 'none';
     
@@ -75,19 +77,37 @@ function displayFavicon(url, sizeInfo, source) {
         // 设置图标来源信息
         sourceDisplay.textContent = `来源: ${source}`;
         
-        // 保存到历史记录
-        saveToHistory(url, sizeInfo, source);
+        // 计算并显示MD5值（使用spark-md5）
+        try {
+            const response = await fetch(url);
+            const arrayBuffer = await response.arrayBuffer();
+            const md5Value = SparkMD5.ArrayBuffer.hash(arrayBuffer);
+            
+            md5Display.textContent = `MD5: ${md5Value}`;
+            previewMd5.textContent = `MD5: ${md5Value}`;
+            
+            // 保存到历史记录（包含MD5值）
+            saveToHistory(url, sizeInfo, source, md5Value);
+        } catch (error) {
+            console.error('计算MD5失败:', error);
+            md5Display.textContent = 'MD5: 计算失败';
+            previewMd5.textContent = 'MD5: 计算失败';
+            // 保存到历史记录（MD5值为空）
+            saveToHistory(url, sizeInfo, source, null);
+        }
     } else {
         favicon.style.display = 'none';
         noIcon.style.display = 'block';
         sizeDisplay.style.display = 'none';
         sourceDisplay.textContent = '';
+        md5Display.textContent = '';
         previewImage.src = '';
+        previewMd5.textContent = '';
     }
 }
 
 // 保存到历史记录
-function saveToHistory(url, sizeInfo, source) {
+function saveToHistory(url, sizeInfo, source, md5Value) {
     const domain = document.getElementById('site-url').textContent;
     const title = document.getElementById('site-title').textContent;
     
@@ -108,6 +128,7 @@ function saveToHistory(url, sizeInfo, source) {
         url, 
         sizeInfo,
         source,
+        md5: md5Value, // 新增MD5字段
         timestamp: new Date().getTime() 
     });
     
@@ -142,7 +163,7 @@ function renderHistory(history) {
         icon.className = 'history-icon';
         icon.src = item.url;
         icon.alt = item.domain;
-        icon.title = `${item.title}\n${item.domain}\n尺寸: ${item.sizeInfo || '未知'}\n来源: ${item.source}`;
+        icon.title = `${item.title}\n${item.domain}\n尺寸: ${item.sizeInfo || '未知'}\n来源: ${item.source}\nMD5: ${item.md5 || '未计算'}`;
         
         // 点击历史图标时显示对应的网站图标
         icon.addEventListener('click', () => {
@@ -150,7 +171,9 @@ function renderHistory(history) {
             document.getElementById('site-title').textContent = item.title;
             document.getElementById('site-url').textContent = item.domain;
             document.getElementById('icon-source').textContent = `来源: ${item.source}`;
+            document.getElementById('icon-md5').textContent = item.md5 ? `MD5: ${item.md5}` : '';
             document.getElementById('previewDomain').textContent = item.domain;
+            document.getElementById('previewMd5').textContent = item.md5 ? `MD5: ${item.md5}` : '';
         });
         
         historyContainer.appendChild(icon);
@@ -179,6 +202,8 @@ function showLoading() {
     document.getElementById('favicon').style.display = 'none';
     document.getElementById('no-icon').style.display = 'none';
     document.getElementById('icon-size').style.display = 'none';
+    document.getElementById('icon-md5').textContent = '';
+    document.getElementById('previewMd5').textContent = '';
 }
 
 // 隐藏加载
@@ -275,6 +300,16 @@ function initEventListeners() {
         const url = document.getElementById('previewImage').src;
         const domain = document.getElementById('previewDomain').textContent;
         downloadFavicon(url, `${domain}-favicon.ico`);
+    });
+    
+    // 复制MD5按钮
+    document.getElementById('copyMd5Btn').addEventListener('click', () => {
+        const md5Text = document.getElementById('icon-md5').textContent.replace('MD5: ', '');
+        if (md5Text && md5Text !== '计算失败') {
+            navigator.clipboard.writeText("web.icon=\""+md5Text+"\"")
+        } else {
+            alert('没有可复制的MD5值');
+        }
     });
     
     // 关闭预览

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "网站图标提取器 - 专业版",
-  "version": "1.3",
-  "description": "直接从网页源代码中提取网站图标，支持多种图标来源",
+  "version": "1.4",
+  "description": "直接从网页源代码中提取网站图标，支持多种图标来源和MD5校验",
   "permissions": ["activeTab", "scripting", "storage"],
   "host_permissions": ["<all_urls>"],
   "action": {
@@ -22,6 +22,7 @@
   },
   "content_scripts": [
     {
+      "resources": ["spark-md5.min.js"],
       "matches": ["<all_urls>"],
       "js": ["content.js"],
       "run_at": "document_end"
