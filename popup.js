@@ -43,6 +43,97 @@ async function getCurrentSiteInfo() {
         showError("发生未知错误");
     }
 }
+function base64EncodeWithNewlines(buffer) {
+    const byteArray = new Uint8Array(buffer);
+    let binaryString = '';
+    for (let i = 0; i < byteArray.length; i++) {
+        binaryString += String.fromCharCode(byteArray[i]);
+    }
+    
+    // 基本base64编码
+    const base64Data = btoa(binaryString);
+    
+    // 每76个字符添加换行符
+    let formattedBase64 = '';
+    for (let i = 0; i < base64Data.length; i += 76) {
+        formattedBase64 += base64Data.substring(i, i + 76) + '\n';
+    }
+    
+    return formattedBase64;
+}
+
+function murmurhash3_32_gc(key, seed = 0) {
+    let h1 = seed;
+    const c1 = 0xcc9e2d51;
+    const c2 = 0x1b873593;
+    const length = key.length;
+    
+    // 处理4字节块
+    let i = 0;
+    while (i <= length - 4) {
+        let k1 = 
+            (key[i] & 0xff) |
+            ((key[i + 1] & 0xff) << 8) |
+            ((key[i + 2] & 0xff) << 16) |
+            ((key[i + 3] & 0xff) << 24);
+        
+        k1 = Math.imul(k1, c1);
+        k1 = (k1 << 15) | (k1 >>> 17); // ROTL32(k1, 15)
+        k1 = Math.imul(k1, c2);
+        
+        h1 ^= k1;
+        h1 = (h1 << 13) | (h1 >>> 19); // ROTL32(h1, 13)
+        h1 = Math.imul(h1, 5) + 0xe6546b64;
+        
+        i += 4;
+    }
+    
+    // 处理尾部
+    let k1 = 0;
+    const tail = length % 4;
+    if (tail === 3) k1 ^= (key[i + 2] & 0xff) << 16;
+    if (tail >= 2) k1 ^= (key[i + 1] & 0xff) << 8;
+    if (tail >= 1) k1 ^= (key[i] & 0xff);
+    
+    if (tail > 0) {
+        k1 = Math.imul(k1, c1);
+        k1 = (k1 << 15) | (k1 >>> 17); // ROTL32(k1, 15)
+        k1 = Math.imul(k1, c2);
+        h1 ^= k1;
+    }
+    
+    // 最终处理
+    h1 ^= length;
+    h1 ^= h1 >>> 16;
+    h1 = Math.imul(h1, 0x85ebca6b);
+    h1 ^= h1 >>> 13;
+    h1 = Math.imul(h1, 0xc2b2ae35);
+    h1 ^= h1 >>> 16;
+    
+    return h1 | 0; // 返回有符号32位整数
+}
+
+// 可靠的 FOFA 哈希计算
+function calculateFofaHash(buffer) {
+    try {
+        // 步骤1: 获取图标内容 (buffer已经是二进制内容)
+        // 步骤2: 进行base64编码并添加换行符
+        const base64Data = base64EncodeWithNewlines(buffer);
+        
+        // 转换为字节数组
+        const encoder = new TextEncoder();
+        const byteArray = encoder.encode(base64Data);
+        
+        // 步骤3: 计算32位MurmurHash3
+        const hash = murmurhash3_32_gc(byteArray);
+        
+        // 返回十进制格式的有符号整数
+        return hash.toString();
+    } catch (error) {
+        console.error('计算FOFA哈希失败:', error);
+        return null;
+    }
+}
 
 // 显示图标
 async function displayFavicon(url, sizeInfo, source) {
@@ -52,20 +143,20 @@ async function displayFavicon(url, sizeInfo, source) {
     const sizeDisplay = document.getElementById('icon-size');
     const sourceDisplay = document.getElementById('icon-source');
     const md5Display = document.getElementById('icon-md5');
+    const fofaDisplay = document.getElementById('icon-fofa');
     const previewImage = document.getElementById('previewImage');
     const previewSize = document.getElementById('previewSize');
     const previewMd5 = document.getElementById('previewMd5');
+    const previewFofa = document.getElementById('previewFofa');
     
     loading.style.display = 'none';
     
     if (url) {
-        // 设置图标
         favicon.src = url;
         favicon.style.display = 'block';
         noIcon.style.display = 'none';
         previewImage.src = url;
         
-        // 设置图标尺寸信息
         if (sizeInfo) {
             sizeDisplay.textContent = sizeInfo;
             sizeDisplay.style.display = 'block';
@@ -74,26 +165,42 @@ async function displayFavicon(url, sizeInfo, source) {
             previewSize.textContent = `尺寸: 未知`;
         }
         
-        // 设置图标来源信息
         sourceDisplay.textContent = `来源: ${source}`;
         
-        // 计算并显示MD5值（使用spark-md5）
         try {
             const response = await fetch(url);
             const arrayBuffer = await response.arrayBuffer();
-            const md5Value = SparkMD5.ArrayBuffer.hash(arrayBuffer);
             
+            // 计算MD5
+            const md5Value = SparkMD5.ArrayBuffer.hash(arrayBuffer);
             md5Display.textContent = `MD5: ${md5Value}`;
             previewMd5.textContent = `MD5: ${md5Value}`;
             
-            // 保存到历史记录（包含MD5值）
-            saveToHistory(url, sizeInfo, source, md5Value);
+            // 计算FOFA哈希
+            const fofaHash = calculateFofaHash(arrayBuffer);
+            const fofaDisplay = document.getElementById('icon-fofa');
+            const previewFofa = document.getElementById('previewFofa');
+            
+            
+            if (fofaHash) {
+                fofaDisplay.textContent = `FOFA: ${fofaHash}`;
+                previewFofa.textContent = `FOFA: ${fofaHash}`;
+            } else {
+                fofaDisplay.textContent = 'FOFA: 计算失败';
+                previewFofa.textContent = 'FOFA: 计算失败';
+            }
+            
+            // 保存到历史记录
+            saveToHistory(url, sizeInfo, source, md5Value, fofaHash);
         } catch (error) {
-            console.error('计算MD5失败:', error);
-            md5Display.textContent = 'MD5: 计算失败';
-            previewMd5.textContent = 'MD5: 计算失败';
-            // 保存到历史记录（MD5值为空）
-            saveToHistory(url, sizeInfo, source, null);
+            console.error('图标处理失败:', error);
+            md5Display.textContent = 'MD5: 获取失败';
+            fofaDisplay.textContent = 'FOFA: 获取失败';
+            previewMd5.textContent = 'MD5: 获取失败';
+            previewFofa.textContent = 'FOFA: 获取失败';
+            
+            // 保存到历史记录（哈希值为空）
+            saveToHistory(url, sizeInfo, source, null, null);
         }
     } else {
         favicon.style.display = 'none';
@@ -101,13 +208,16 @@ async function displayFavicon(url, sizeInfo, source) {
         sizeDisplay.style.display = 'none';
         sourceDisplay.textContent = '';
         md5Display.textContent = '';
+        fofaDisplay.textContent = '';
         previewImage.src = '';
         previewMd5.textContent = '';
+        previewFofa.textContent = '';
     }
 }
 
+
 // 保存到历史记录
-function saveToHistory(url, sizeInfo, source, md5Value) {
+function saveToHistory(url, sizeInfo, source, md5Value,fofaHash) {
     const domain = document.getElementById('site-url').textContent;
     const title = document.getElementById('site-title').textContent;
     
@@ -129,6 +239,7 @@ function saveToHistory(url, sizeInfo, source, md5Value) {
         sizeInfo,
         source,
         md5: md5Value, // 新增MD5字段
+        fofa: fofaHash,
         timestamp: new Date().getTime() 
     });
     
@@ -163,17 +274,18 @@ function renderHistory(history) {
         icon.className = 'history-icon';
         icon.src = item.url;
         icon.alt = item.domain;
-        icon.title = `${item.title}\n${item.domain}\n尺寸: ${item.sizeInfo || '未知'}\n来源: ${item.source}\nMD5: ${item.md5 || '未计算'}`;
-        
+        icon.title = `${item.title}\n${item.domain}\n尺寸: ${item.sizeInfo || '未知'}\n来源: ${item.source}\nHunter: ${item.md5 || '未计算'}\nFOFA: ${item.fofa || '未计算'}`;
+
         // 点击历史图标时显示对应的网站图标
         icon.addEventListener('click', () => {
             displayFavicon(item.url, item.sizeInfo, item.source);
             document.getElementById('site-title').textContent = item.title;
             document.getElementById('site-url').textContent = item.domain;
             document.getElementById('icon-source').textContent = `来源: ${item.source}`;
-            document.getElementById('icon-md5').textContent = item.md5 ? `MD5: ${item.md5}` : '';
-            document.getElementById('previewDomain').textContent = item.domain;
-            document.getElementById('previewMd5').textContent = item.md5 ? `MD5: ${item.md5}` : '';
+            document.getElementById('icon-md5').textContent = item.md5 ? `Hunter: ${item.md5}` : '';
+            document.getElementById('icon-fofa').textContent = item.fofa ? `FOFA: ${item.fofa}` : '';
+            document.getElementById('previewMd5').textContent = item.md5 ? `Hunter: ${item.md5}` : '';
+            document.getElementById('previewFofa').textContent = item.fofa ? `FOFA: ${item.fofa}` : '';
         });
         
         historyContainer.appendChild(icon);
@@ -311,7 +423,14 @@ function initEventListeners() {
             alert('没有可复制的MD5值');
         }
     });
-    
+        document.getElementById('copyFofaBtn').addEventListener('click', () => {
+        const fofaText = document.getElementById('icon-fofa').textContent.replace('FOFA: ', '');
+        if (fofaText && fofaText !== '计算失败') {
+            navigator.clipboard.writeText("icon_hash=\""+fofaText+"\"")
+        } else {
+            alert('没有可复制的FOFA哈希');
+        }
+    });
     // 关闭预览
     document.querySelector('.close-preview').addEventListener('click', () => {
         document.getElementById('iconPreview').style.display = 'none';

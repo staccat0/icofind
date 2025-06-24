@@ -4,8 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>icofind</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
     <script src="spark-md5.min.js"></script>
+    <script src="murmurhash3.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -380,6 +381,7 @@
             <p id="site-url">example.com</p>
             <p id="icon-source" class="icon-source"></p>
             <p id="icon-md5" class="icon-md5"></p>
+            <p id="icon-fofa" class="icon-md5"></p> 
         </div>
     </div>
 
@@ -388,13 +390,16 @@
             <i class="fas fa-download"></i> 下载图标
         </button>
         <button id="copyMd5Btn" class="btn btn-info">
-            <i class="fas fa-copy"></i> copy hunter
+            <i class="fas fa-copy"></i> 复制hunter
+        </button>
+         <button id="copyFofaBtn" class="btn btn-info">
+            <i class="fas fa-copy"></i> 复制FOFA
         </button>
         <button id="viewSourceBtn" class="btn btn-success">
             <i class="fas fa-code"></i> 查看源码
         </button>
 
-        <button id="previewBtn" class="btn btn-warning" style="grid-column: span 3;">
+        <button id="previewBtn" class="btn btn-warning" style="grid-column: span 4;">
             <i class="fas fa-expand"></i> 预览图标
         </button>
     </div>
@@ -419,6 +424,7 @@
                 <p id="previewDomain">example.com</p>
                 <p id="previewSize">尺寸: 未知</p>
                 <p id="previewMd5"></p>
+                <p id="previewFofa"></p>
             </div>
             <button id="downloadPreviewBtn" class="btn btn-primary" style="margin-top: 15px;">
                 <i class="fas fa-download"></i> 下载图标

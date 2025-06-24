@@ -1,9 +1,7 @@
 # icofind
 
-自动获取当前访问站点的ico图标，并生成md5值，用于在hunter搜索
+自动获取当前访问站点的ico图标的hash信息
 
-![1750649586332](images/READ/1750649586332.png)
+已实现hunter和fofa
 
-## 更新计划
-
-fofa和shodan的md5值计划中
+![1750780859227](images/README/1750780859227.png)
