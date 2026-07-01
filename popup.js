@@ -766,12 +766,14 @@ function initEventListeners() {
             if (!Array.isArray(imported)) throw new Error('格式错误');
             
             const current = await getFingerprints();
-            const existingIds = new Set(current.map(f => f.id));
+            const existingKeys = new Set(current.map(f => f.type + '|' + f.hash));
             let added = 0;
             for (const item of imported) {
                 if (!item.type || !item.hash || !item.name) continue;
-                if (!existingIds.has(item.id)) {
-                    current.push({ id: item.id || Date.now() + Math.random(), type: item.type, hash: item.hash, name: item.name });
+                const key = item.type + '|' + item.hash;
+                if (!existingKeys.has(key)) {
+                    current.push({ id: Date.now() + Math.random(), type: item.type, hash: item.hash, name: item.name });
+                    existingKeys.add(key);
                     added++;
                 }
             }
