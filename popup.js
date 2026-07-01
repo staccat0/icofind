@@ -804,13 +804,83 @@ function initEventListeners() {
 
     // 清除缓存
     document.getElementById('clearCacheBtn').addEventListener('click', async () => {
+        // 清除哈希缓存
         await STORE.remove('hashCache');
-        const all = await STORE.get(null);
+        // 获取所有 key 并清除 _popup 缓存
+        const all = await new Promise(resolve => chrome.storage.local.get(null, resolve));
         const keysToRemove = Object.keys(all).filter(k => k.endsWith('_popup'));
         if (keysToRemove.length > 0) {
-            await STORE.remove(keysToRemove);
+            await new Promise(resolve => chrome.storage.local.remove(keysToRemove, resolve));
         }
-        alert('缓存已清除');
+        // 重置内存状态并重新加载
+        _currentIcons = [];
+        _currentHashes = [];
+        _curIconIdx = 0;
+        _currentPageUrl = '';
+        getCurrentSiteInfo();
+    });
+
+    // 自定义 URL 计算
+    document.getElementById('customUrlBtn').addEventListener('click', async () => {
+        const rawUrl = document.getElementById('customUrlInput').value.trim();
+        if (!rawUrl) { alert('请输入图标 URL'); return; }
+
+        let url;
+        try { url = new URL(rawUrl).href; } catch (e) { alert('URL 格式不正确'); return; }
+
+        showLoading();
+        hideError();
+        document.getElementById('icon-source').textContent = '来源: 手动输入';
+
+        try {
+            const response = await fetch(url);
+            if (!response.ok) { showError('请求失败，状态码: ' + response.status); return; }
+            const arrayBuffer = await response.arrayBuffer();
+            const md5 = SparkMD5.ArrayBuffer.hash(arrayBuffer);
+            const fofa = calculateFofaHash(arrayBuffer);
+
+            _currentIcons = [{ faviconUrl: url, sizeInfo: '未知尺寸', source: '手动输入' }];
+            _currentHashes = [{ md5, fofa }];
+            _curIconIdx = 0;
+            _currentPageUrl = '';
+
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('favicon').style.display = 'block';
+            document.getElementById('no-icon').style.display = 'none';
+            document.getElementById('favicon').src = url;
+            document.getElementById('previewImage').src = url;
+            document.getElementById('icon-size').style.display = 'none';
+            document.getElementById('previewSize').textContent = '尺寸: 未知';
+
+            document.getElementById('icon-md5').textContent = md5;
+            document.getElementById('icon-fofa').textContent = fofa || '获取失败';
+            document.getElementById('icon-quake').textContent = md5;
+            document.getElementById('previewMd5').textContent = 'Hunter: ' + md5;
+            document.getElementById('previewFofa').textContent = 'FOFA: ' + (fofa || '获取失败');
+
+            // 匹配指纹库
+            const fps = await getFingerprints();
+            const matchMd5 = fps.filter(f => f.type === 'md5' && f.hash === md5);
+            const matchFofa = fps.filter(f => f.type === 'fofa' && f.hash === fofa);
+            const allMatched = [...matchMd5, ...matchFofa];
+            const names = [...new Set(allMatched.map(m => m.name))];
+            const siteMatch = document.getElementById('site-match');
+            if (siteMatch) {
+                if (names.length > 0) {
+                    siteMatch.innerHTML = names.map(n =>
+                        '<span class="site-match-tag">&#9878; ' + escapeHtml(n) + '</span>'
+                    ).join(' ');
+                } else {
+                    siteMatch.innerHTML = '';
+                }
+            }
+
+            document.getElementById('iconPrev').classList.remove('show');
+            document.getElementById('iconNext').classList.remove('show');
+            updateStatusIndicator('active');
+        } catch (e) {
+            showError('请求失败: ' + e.message);
+        }
     });
 }
 

@@ -361,6 +361,28 @@
             background: var(--green-dim);
         }
 
+        /* ===== Custom URL ===== */
+        .custom-url {
+            margin: 0 14px 6px;
+            display: flex;
+            gap: 6px;
+        }
+
+        .custom-url-input {
+            flex: 1;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: var(--radius);
+            padding: 7px 12px;
+            font-size: 11px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .custom-url-input:focus { border-color: var(--blue); }
+        .custom-url-input::placeholder { color: var(--text-dim); }
+
         /* ===== Actions ===== */
         .actions {
             display: grid;
@@ -847,6 +869,12 @@
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
             </button>
         </div>
+    </div>
+
+    <!-- ===== Custom URL ===== -->
+    <div class="custom-url">
+        <input type="text" id="customUrlInput" class="custom-url-input" placeholder="输入图标 URL 计算 hash...">
+        <button id="customUrlBtn" class="btn accent" style="padding:7px 12px;font-size:10px;">计算</button>
     </div>
 
     <!-- ===== Actions ===== -->
