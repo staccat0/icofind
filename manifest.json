@@ -26,7 +26,6 @@
 
   "content_scripts": [
     {
-      "resources": ["spark-md5.min.js"],
       "matches": ["<all_urls>"],
       "js": ["content.js"],
       "run_at": "document_end"

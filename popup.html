@@ -4,436 +4,945 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>icofind</title>
-
-    <script src="spark-md5.min.js"></script>
-    <script src="murmurhash3.min.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+        :root {
+            --bg: #0a0e14;
+            --surface: #12171d;
+            --surface2: #171c24;
+            --border: #1e2530;
+            --border-hover: #2a3340;
+            --text: #c9ced6;
+            --text-dim: #6b7380;
+            --text-bright: #e6edf5;
+            --blue: #409eff;
+            --blue-dim: rgba(64, 158, 255, 0.12);
+            --orange: #e08855;
+            --orange-dim: rgba(224, 136, 85, 0.12);
+            --purple: #9d7cd8;
+            --purple-dim: rgba(157, 124, 216, 0.12);
+            --green: #3fb950;
+            --green-dim: rgba(63, 185, 80, 0.12);
+            --red: #f85149;
+            --red-dim: rgba(248, 81, 73, 0.1);
+            --radius: 10px;
+            --radius-sm: 6px;
         }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             width: 400px;
-            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-            color: #fff;
-            padding: 20px;
-            min-height: 480px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
             overflow-x: hidden;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
         }
 
+        body::-webkit-scrollbar { width: 4px; }
+        body::-webkit-scrollbar-thumb { background: var(--border-hover); border-radius: 4px; }
+
+        /* ===== Header ===== */
         .header {
+            background: linear-gradient(180deg, #141b24 0%, #0f151d 100%);
+            padding: 22px 20px 16px;
             text-align: center;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+            border-bottom: 1px solid var(--border);
             position: relative;
         }
 
-        .header h1 {
-            font-size: 24px;
+        .header::after {
+            content: '';
+            position: absolute;
+            bottom: -1px;
+            left: 16px;
+            right: 16px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(64,158,255,0.3), var(--purple-dim), transparent);
+        }
+
+        .header-logo {
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 12px;
+            gap: 10px;
+            margin-bottom: 2px;
+        }
+
+        .header-logo svg { width: 26px; height: 26px; }
+
+        .header h1 {
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: -0.4px;
+            background: linear-gradient(135deg, #e6edf5 0%, #7aa2d4 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header .subtitle {
+            font-size: 11px;
+            color: var(--text-dim);
+            letter-spacing: 0.5px;
+        }
+
+        .status-dot {
+            position: absolute;
+            top: 16px;
+            right: 18px;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--green);
+            box-shadow: 0 0 8px rgba(63,185,80,0.4);
+            transition: all 0.3s;
+        }
+
+        .status-dot.error { background: var(--red); box-shadow: 0 0 8px rgba(248,81,73,0.4); }
+        .status-dot.warning { background: #d2991d; box-shadow: 0 0 8px rgba(210,153,29,0.4); }
+
+        /* ===== Error ===== */
+        .error-box {
+            display: none;
+            margin: 10px 14px 0;
+            background: var(--red-dim);
+            border: 1px solid rgba(248,81,73,0.2);
+            border-radius: var(--radius);
+            padding: 12px 14px;
+            text-align: center;
+        }
+
+        .error-box .err-title {
+            color: var(--red);
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .error-box .err-msg {
+            font-size: 11px;
+            color: var(--text-dim);
             margin-bottom: 8px;
         }
 
-        .header p {
-            font-size: 14px;
-            opacity: 0.8;
-            margin-top: 5px;
+        .error-box .err-btn {
+            background: rgba(248,81,73,0.15);
+            border: 1px solid rgba(248,81,73,0.25);
+            color: var(--red);
+            padding: 6px 14px;
+            border-radius: var(--radius-sm);
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
         }
 
-        .status-indicator {
+        .error-box .err-btn:hover { background: rgba(248,81,73,0.25); }
+
+        /* ===== Icon Card ===== */
+        .icon-card {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin: 12px 14px;
+            padding: 14px;
+            background: linear-gradient(135deg, var(--surface) 0%, #151c25 100%);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+        }
+
+        .icon-card .favicon-wrap {
+            position: relative;
+            width: 68px;
+            height: 68px;
+            min-width: 68px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+        }
+
+        .icon-card .favicon-wrap img {
+            width: 44px;
+            height: 44px;
+            object-fit: contain;
+            border-radius: 8px;
+        }
+
+        .icon-card .favicon-wrap .no-icon {
+            font-size: 28px;
+            opacity: 0.3;
+        }
+
+        .icon-card .favicon-wrap .size-tag {
             position: absolute;
-            top: 10px;
-            right: 10px;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background-color: #4CAF50;
-            box-shadow: 0 0 8px #4CAF50;
+            bottom: 3px;
+            right: 3px;
+            background: rgba(0,0,0,0.75);
+            color: var(--text-dim);
+            font-size: 8px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 500;
         }
 
-        .icon-display {
+        .icon-arrow {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 20px;
+            height: 24px;
+            background: rgba(0,0,0,0.5);
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            opacity: 0;
+        }
+
+        .favicon-wrap:hover .icon-arrow,
+        .icon-arrow.show { opacity: 1; }
+
+        .icon-arrow:hover {
+            background: rgba(0,0,0,0.8);
+            color: var(--text-bright);
+        }
+
+        .icon-prev { left: 0; border-radius: 0 6px 6px 0; }
+        .icon-next { right: 0; border-radius: 6px 0 0 6px; }
+
+        .icon-card .loading-wrap {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 15px;
-            margin-bottom: 25px;
+            gap: 4px;
+            color: var(--text-dim);
+            font-size: 11px;
         }
 
-        .favicon-container {
-            width: 140px;
-            height: 140px;
-            background: rgba(255, 255, 255, 0.08);
-            border-radius: 24px;
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 2.5px solid var(--border);
+            border-radius: 50%;
+            border-top-color: var(--blue);
+            animation: spin 0.7s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .icon-card .site-meta { flex: 1; min-width: 0; }
+
+        .icon-card .site-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-bright);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 1px;
+        }
+
+        .icon-card .site-domain {
+            font-size: 11px;
+            color: var(--blue);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 4px;
+        }
+
+        .icon-card .site-source {
+            font-size: 10px;
+            color: var(--text-dim);
+        }
+
+        .site-match {
+            margin-top: 5px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .site-match:empty { display: none; }
+
+        .site-match .site-match-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 5px;
+            background: var(--green-dim);
+            border: 1px solid rgba(63,185,80,0.25);
+            color: var(--green);
+        }
+
+        /* ===== Hash Section ===== */
+        .hash-section {
+            margin: 0 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .hash-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 8px 12px;
+            transition: all 0.2s;
+        }
+
+        .hash-row:hover { border-color: var(--border-hover); }
+
+        .hash-label {
+            font-weight: 700;
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+            min-width: 52px;
+            text-align: center;
+        }
+
+        .hash-label.hunter { background: var(--blue-dim); color: var(--blue); }
+        .hash-label.fofa { background: var(--orange-dim); color: var(--orange); }
+        .hash-label.quake { background: var(--purple-dim); color: var(--purple); }
+
+        .hash-value {
+            flex: 1;
+            font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: var(--text-dim);
+            word-break: break-all;
+            min-width: 0;
+        }
+
+        .hash-copy {
+            background: none;
+            border: 1px solid transparent;
+            color: var(--text-dim);
+            width: 28px;
+            height: 28px;
+            min-width: 28px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
-            backdrop-filter: blur(5px);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            overflow: hidden;
-            position: relative;
+            transition: all 0.2s;
         }
 
-        .favicon {
-            width: 80px;
-            height: 80px;
-            object-fit: contain;
-            border-radius: 12px;
+        .hash-copy:hover {
+            color: var(--text-bright);
+            border-color: var(--border-hover);
+            background: var(--surface2);
         }
 
-        .no-icon {
-            font-size: 48px;
-            color: rgba(255, 255, 255, 0.2);
+        .hash-copy.copied {
+            color: var(--green);
+            border-color: rgba(63,185,80,0.3);
+            background: var(--green-dim);
         }
 
-        .site-info {
-            text-align: center;
-            background: rgba(255, 255, 255, 0.08);
-            border-radius: 14px;
-            padding: 15px;
-            width: 100%;
-            backdrop-filter: blur(5px);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-        }
-
-        .site-info h2 {
-            font-size: 18px;
-            margin-bottom: 8px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .site-info p {
-            font-size: 14px;
-            opacity: 0.8;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        
-        .icon-md5 {
-            font-size: 12px;
-            word-break: break-all;
-            margin-top: 5px;
-        }
-
-        .controls {
+        /* ===== Actions ===== */
+        .actions {
             display: grid;
             grid-template-columns: 1fr 1fr 1fr;
-            gap: 10px;
-            margin-bottom: 15px;
+            gap: 6px;
+            margin: 12px 14px;
         }
 
         .btn {
-            padding: 12px;
-            border: none;
-            border-radius: 12px;
-            background: rgba(255, 255, 255, 0.15);
-            color: white;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
-            backdrop-filter: blur(5px);
-            border: 1px solid rgba(255, 255, 255, 0.15);
+            gap: 5px;
+            padding: 9px 6px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: var(--surface);
+            color: var(--text);
+            white-space: nowrap;
         }
 
         .btn:hover {
-            background: rgba(255, 255, 255, 0.25);
-            transform: translateY(-2px);
+            border-color: var(--border-hover);
+            background: var(--surface2);
         }
 
-        .btn:active {
-            transform: translateY(0);
+        .btn:active { transform: scale(0.97); }
+
+        .btn.accent {
+            background: #1a5fb4;
+            border-color: #1a5fb4;
+            color: #fff;
+            box-shadow: 0 1px 4px rgba(26,95,180,0.3);
         }
 
-        .btn-primary {
-            background: linear-gradient(135deg, #00c6ff, #0072ff);
+        .btn.accent:hover {
+            background: #2970cc;
+            border-color: #2970cc;
         }
 
-        .btn-primary:hover {
-            background: linear-gradient(135deg, #00b4e6, #0066cc);
-        }
-
-        .btn-success {
-            background: linear-gradient(135deg, #56ab2f, #a8e063);
-        }
-
-        .btn-success:hover {
-            background: linear-gradient(135deg, #4d9929, #97d15a);
-        }
-
-        .btn-warning {
-            background: linear-gradient(135deg, #ff8c00, #ff2d55);
-        }
-
-        .btn-warning:hover {
-            background: linear-gradient(135deg, #e67e00, #e62a4d);
-        }
-        
-        .btn-info {
-            background: linear-gradient(135deg, #5c67f2, #8e44ad);
-        }
-        
-        .btn-info:hover {
-            background: linear-gradient(135deg, #4a54e1, #7d3c98);
-        }
-
+        /* ===== History ===== */
         .history {
-            margin-top: 20px;
-            padding-top: 15px;
-            border-top: 1px solid rgba(255, 255, 255, 0.15);
+            margin: 0 14px 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
         }
 
-        .history h3 {
-            font-size: 16px;
-            margin-bottom: 12px;
+        .history-header {
             display: flex;
             align-items: center;
-            gap: 8px;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+
+        .history-header h3 {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-dim);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .history-header .count {
+            font-size: 10px;
+            color: var(--text-dim);
+            opacity: 0.7;
         }
 
         .history-icons {
             display: flex;
-            gap: 12px;
+            gap: 8px;
             overflow-x: auto;
-            padding: 5px 0 15px;
+            padding: 2px 0;
         }
 
+        .history-icons::-webkit-scrollbar { height: 2px; }
+        .history-icons::-webkit-scrollbar-thumb { background: var(--border-hover); border-radius: 2px; }
+
         .history-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 8px;
+            width: 36px;
+            height: 36px;
+            min-width: 36px;
+            border-radius: var(--radius-sm);
             object-fit: contain;
-            background: rgba(255, 255, 255, 0.08);
+            background: var(--surface);
+            border: 1px solid var(--border);
             padding: 5px;
             cursor: pointer;
-            transition: all 0.2s ease;
-            border: 1px solid rgba(255, 255, 255, 0.15);
+            transition: all 0.2s;
         }
 
         .history-icon:hover {
-            transform: scale(1.1);
-            background: rgba(255, 255, 255, 0.15);
+            border-color: var(--blue);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
         }
 
-        .footer {
+        .history-empty {
+            font-size: 11px;
+            color: var(--text-dim);
             text-align: center;
+            padding: 10px 0;
+        }
+
+        /* ===== Fingerprint Manager ===== */
+        .fp-manager {
+            margin: 0 14px 12px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+
+        .fp-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.2s;
+            background: var(--surface);
+        }
+
+        .fp-header:hover { background: var(--surface2); }
+
+        .fp-header h3 {
             font-size: 12px;
-            opacity: 0.7;
-            padding-top: 15px;
-            border-top: 1px solid rgba(255, 255, 255, 0.15);
-            margin-top: 10px;
+            font-weight: 600;
+            color: var(--text-dim);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            flex: 1;
         }
 
-        .icon-size {
-            position: absolute;
-            bottom: 8px;
-            right: 8px;
-            background: rgba(0, 0, 0, 0.6);
-            color: white;
+        .fp-count {
             font-size: 10px;
-            padding: 2px 8px;
-            border-radius: 10px;
+            color: var(--text-dim);
+            opacity: 0.7;
         }
 
-        .loading {
+        .fp-arrow {
+            transition: transform 0.25s;
+            color: var(--text-dim);
+        }
+
+        .fp-manager.open .fp-arrow { transform: rotate(180deg); }
+
+        .fp-body {
+            display: none;
+            border-top: 1px solid var(--border);
+            padding: 10px 12px;
+            background: var(--bg);
+        }
+
+        .fp-manager.open .fp-body { display: block; }
+
+        .fp-add {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 8px;
+        }
+
+        .fp-select {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: var(--radius-sm);
+            padding: 5px 6px;
+            font-size: 10px;
+            cursor: pointer;
+            min-width: 90px;
+        }
+
+        .fp-input {
+            flex: 1;
+            min-width: 0;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: var(--radius-sm);
+            padding: 5px 8px;
+            font-size: 10px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .fp-input:focus { border-color: var(--blue); }
+        .fp-input::placeholder { color: var(--text-dim); }
+
+        .fp-list {
             display: flex;
             flex-direction: column;
-            align-items: center;
-            padding: 20px 0;
+            gap: 4px;
+            max-height: 140px;
+            overflow-y: auto;
         }
 
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid rgba(255, 255, 255, 0.1);
-            border-radius: 50%;
-            border-top: 4px solid #00c6ff;
-            animation: spin 1s linear infinite;
-            margin-bottom: 15px;
-        }
+        .fp-list::-webkit-scrollbar { width: 3px; }
+        .fp-list::-webkit-scrollbar-thumb { background: var(--border-hover); border-radius: 3px; }
 
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .icon-source {
-            margin-top: 8px;
-            font-size: 12px;
-            opacity: 0.7;
-        }
-
-        .error-box {
-            background: rgba(255, 87, 87, 0.15);
-            border: 1px solid rgba(255, 87, 87, 0.3);
-            border-radius: 12px;
-            padding: 15px;
-            margin-bottom: 15px;
+        .fp-empty {
+            font-size: 11px;
+            color: var(--text-dim);
             text-align: center;
+            padding: 6px 0;
         }
 
-        .error-box h3 {
-            color: #ff5757;
-            margin-bottom: 8px;
+        .fp-item {
             display: flex;
             align-items: center;
-            justify-content: center;
-            gap: 8px;
+            gap: 6px;
+            padding: 5px 8px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: 10px;
+            transition: border-color 0.2s;
         }
 
-        .troubleshoot-btn {
-            margin-top: 10px;
-            background: rgba(255, 87, 87, 0.3);
+        .fp-item:hover { border-color: var(--border-hover); }
+
+        .fp-item .fp-type-badge {
+            font-size: 9px;
+            font-weight: 700;
+            padding: 1px 5px;
+            border-radius: 3px;
+            letter-spacing: 0.3px;
         }
 
-        .troubleshoot-btn:hover {
-            background: rgba(255, 87, 87, 0.4);
+        .fp-type-badge.md5 { background: var(--blue-dim); color: var(--blue); }
+        .fp-type-badge.fofa { background: var(--orange-dim); color: var(--orange); }
+
+        .fp-item .fp-item-hash {
+            flex: 1;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 9px;
+            color: var(--text-dim);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            min-width: 0;
         }
 
-        .icon-preview {
+        .fp-item .fp-item-name {
+            color: var(--text);
+            font-weight: 500;
+            white-space: nowrap;
+            max-width: 90px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .fp-item .fp-delete {
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            padding: 2px 3px;
+            border-radius: 3px;
+            font-size: 13px;
+            line-height: 1;
+            transition: all 0.2s;
+            opacity: 0;
+        }
+
+        .fp-item:hover .fp-delete { opacity: 1; }
+        .fp-item .fp-delete:hover { color: var(--red); background: var(--red-dim); }
+
+        .fp-actions {
+            display: flex;
+            gap: 5px;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid var(--border);
+        }
+
+        /* ===== Footer ===== */
+        .footer {
+            text-align: center;
+            padding: 10px 14px;
+            border-top: 1px solid var(--border);
+            font-size: 10px;
+            color: var(--text-dim);
+        }
+
+        .footer .team {
+            color: var(--text-dim);
+            opacity: 0.7;
+            margin-top: 1px;
+        }
+
+        .cache-clear-btn {
+            margin-top: 6px;
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--text-dim);
+            padding: 3px 12px;
+            border-radius: 4px;
+            font-size: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .cache-clear-btn:hover {
+            color: var(--red);
+            border-color: rgba(248,81,73,0.4);
+            background: var(--red-dim);
+        }
+
+        /* ===== Preview Modal ===== */
+        .modal-overlay {
             display: none;
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
+            inset: 0;
+            background: rgba(0,0,0,0.88);
             z-index: 1000;
             align-items: center;
             justify-content: center;
+            backdrop-filter: blur(6px);
         }
 
-        .preview-content {
-            background: #1e293b;
+        .modal {
+            background: var(--surface);
+            border: 1px solid var(--border);
             border-radius: 16px;
-            padding: 20px;
+            padding: 22px;
             text-align: center;
-            max-width: 90%;
+            max-width: 300px;
+            width: 90%;
+            position: relative;
+            box-shadow: 0 16px 48px rgba(0,0,0,0.5);
         }
 
-        .preview-content img {
-            max-width: 200px;
-            max-height: 200px;
-            margin: 15px 0;
+        .modal h3 {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-bright);
+            margin-bottom: 14px;
         }
 
-        .close-preview {
+        .modal img {
+            max-width: 150px;
+            max-height: 150px;
+            object-fit: contain;
+            border-radius: 12px;
+            background: var(--bg);
+            padding: 10px;
+        }
+
+        .modal .meta {
+            margin-top: 12px;
+            font-size: 11px;
+            color: var(--text-dim);
+        }
+
+        .modal .meta p {
+            margin: 2px 0;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+        }
+
+        .modal .close-btn {
             position: absolute;
-            top: 15px;
-            right: 15px;
-            background: rgba(255, 255, 255, 0.1);
+            top: 8px;
+            right: 8px;
+            width: 26px;
+            height: 26px;
             border: none;
-            color: white;
-            width: 30px;
-            height: 30px;
+            background: var(--surface2);
+            color: var(--text-dim);
             border-radius: 50%;
             cursor: pointer;
-            font-size: 16px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
         }
 
-        .icon-info {
-            margin-top: 10px;
-            font-size: 14px;
-            opacity: 0.8;
+        .modal .close-btn:hover { background: var(--border-hover); color: var(--text-bright); }
+
+        .modal .modal-download {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            margin-top: 12px;
+            padding: 7px 18px;
+            background: #1a5fb4;
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
         }
+
+        .modal .modal-download:hover { background: #2970cc; }
+
+        /* ===== Entrance animation ===== */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .icon-card, .hash-section, .actions, .history, .fp-manager, .footer {
+            animation: fadeIn 0.35s ease-out both;
+        }
+
+        .hash-section { animation-delay: 0.05s; }
+        .actions { animation-delay: 0.1s; }
+        .history { animation-delay: 0.15s; }
+        .fp-manager { animation-delay: 0.2s; }
+        .footer { animation-delay: 0.25s; }
     </style>
 </head>
 <body>
+    <!-- ===== Header ===== -->
     <div class="header">
-        <div class="status-indicator" id="statusIndicator"></div>
-        <h1><i class="fas fa-search"></i> icofind</h1>
-        <p>自动提取站点ico计算hash</p>
+        <div class="status-dot" id="statusIndicator"></div>
+        <div class="header-logo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#409eff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="M21 21l-4.35-4.35"/>
+            </svg>
+            <h1>icofind</h1>
+        </div>
+        <div class="subtitle">站点图标提取 &amp; 哈希计算</div>
     </div>
 
-    <div id="errorContainer" class="error-box" style="display: none;">
-        <h3><i class="fas fa-exclamation-triangle"></i> 图标提取失败</h3>
-        <p id="errorMessage">无法提取当前网站的图标，请尝试以下解决方案</p>
-        <button id="troubleshootBtn" class="btn troubleshoot-btn">
-            <i class="fas fa-wrench"></i> 尝试解决方案
-        </button>
+    <!-- ===== Error ===== -->
+    <div id="errorContainer" class="error-box">
+        <div class="err-title">&#9888; 图标提取失败</div>
+        <div class="err-msg" id="errorMessage">无法提取当前网站的图标</div>
+        <button id="troubleshootBtn" class="err-btn">&#9881; 尝试解决方案</button>
     </div>
 
-    <div class="icon-display">
-        <div class="favicon-container">
-            <div id="loading" class="loading">
+    <!-- ===== Icon Card ===== -->
+    <div class="icon-card">
+        <div class="favicon-wrap">
+            <div id="loading" class="loading-wrap">
                 <div class="spinner"></div>
-                <div>正在提取图标...</div>
+                <span>提取中...</span>
             </div>
-            <img id="favicon" class="favicon" src="" alt="网站图标" style="display: none;">
-            <i id="no-icon" class="fas fa-image no-icon" style="display: none;"></i>
-            <div id="icon-size" class="icon-size"></div>
+            <img id="favicon" src="" alt="站点图标" style="display:none">
+            <span id="no-icon" class="no-icon" style="display:none">&#128444;</span>
+            <div id="icon-size" class="size-tag"></div>
+            <button id="iconPrev" class="icon-arrow icon-prev" title="上一个图标">&lsaquo;</button>
+            <button id="iconNext" class="icon-arrow icon-next" title="下一个图标">&rsaquo;</button>
         </div>
-        <div class="site-info">
-            <h2 id="site-title">正在获取网站信息...</h2>
-            <p id="site-url">example.com</p>
-            <p id="icon-source" class="icon-source"></p>
-            <p id="icon-md5" class="icon-md5"></p>
-            <p id="icon-fofa" class="icon-md5"></p> 
+        <div class="site-meta">
+            <div class="site-title" id="site-title">正在获取网站信息...</div>
+            <div class="site-domain" id="site-url">example.com</div>
+            <div class="site-source" id="icon-source"></div>
+            <div class="site-match" id="site-match"></div>
         </div>
     </div>
 
-    <div class="controls">
-        <button id="downloadBtn" class="btn btn-primary">
-            <i class="fas fa-download"></i> 下载图标
-        </button>
-        <button id="copyMd5Btn" class="btn btn-info">
-            <i class="fas fa-copy"></i> 复制hunter
-        </button>
-         <button id="copyFofaBtn" class="btn btn-info">
-            <i class="fas fa-copy"></i> 复制FOFA
-        </button>
-        <button id="viewSourceBtn" class="btn btn-success">
-            <i class="fas fa-code"></i> 查看源码
-        </button>
+    <!-- ===== Hash Info ===== -->
+    <div class="hash-section">
+        <div class="hash-row">
+            <span class="hash-label hunter">Hunter</span>
+            <span class="hash-value" id="icon-md5">等待计算...</span>
+            <button class="hash-copy" id="copyMd5Btn" title="复制 Hunter">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+        </div>
+        <div class="hash-row">
+            <span class="hash-label fofa">FOFA</span>
+            <span class="hash-value" id="icon-fofa">等待计算...</span>
+            <button class="hash-copy" id="copyFofaBtn" title="复制 FOFA">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+        </div>
+        <div class="hash-row">
+            <span class="hash-label quake">Quake</span>
+            <span class="hash-value" id="icon-quake">等待计算...</span>
+            <button class="hash-copy" id="copyQuakeBtn" title="复制 Quake">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+        </div>
+    </div>
 
-        <button id="previewBtn" class="btn btn-warning" style="grid-column: span 4;">
-            <i class="fas fa-expand"></i> 预览图标
+    <!-- ===== Actions ===== -->
+    <div class="actions">
+        <button id="downloadBtn" class="btn accent">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            下载
+        </button>
+        <button id="viewSourceBtn" class="btn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            源码
+        </button>
+        <button id="previewBtn" class="btn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            预览
         </button>
     </div>
 
+    <!-- ===== History ===== -->
     <div class="history">
-        <h3><i class="fas fa-history"></i> 最近提取 <span id="historyCount">(0)</span></h3>
+        <div class="history-header">
+            <h3>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                最近提取
+            </h3>
+            <span class="count" id="historyCount">(0)</span>
+        </div>
         <div id="history-icons" class="history-icons">
-            <!-- 历史记录将通过JS动态添加 -->
+            <div class="history-empty">暂无历史记录</div>
         </div>
     </div>
 
-    <div class="footer">
-        <p>by staccato</p>
-        <p>东方隐侠安全团队</p>
+    <!-- ===== Fingerprint Manager ===== -->
+    <div class="fp-manager">
+        <div class="fp-header" id="fpToggle">
+            <h3>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                指纹库管理
+            </h3>
+            <span class="fp-count" id="fpCount">(0)</span>
+            <svg class="fp-arrow" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="fp-body" id="fpBody">
+            <div class="fp-add">
+                <select id="fpType" class="fp-select">
+                    <option value="md5">Hunter (MD5)</option>
+                    <option value="fofa">FOFA</option>
+                </select>
+                <input type="text" id="fpHash" class="fp-input" placeholder="Hash 值">
+                <input type="text" id="fpName" class="fp-input" placeholder="系统名称">
+                <button id="fpAddBtn" class="btn accent" style="padding:5px 10px;font-size:10px;">添加</button>
+            </div>
+            <div id="fpList" class="fp-list">
+                <div class="fp-empty">暂无指纹数据</div>
+            </div>
+            <div class="fp-actions">
+                <button id="fpExportBtn" class="btn" style="flex:1;padding:5px 8px;font-size:10px;">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    导出
+                </button>
+                <button id="fpImportBtn" class="btn" style="flex:1;padding:5px 8px;font-size:10px;">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    导入
+                </button>
+            </div>
+            <input type="file" id="fpFileInput" accept=".json" style="display:none">
+        </div>
     </div>
 
-    <div id="iconPreview" class="icon-preview">
-        <button class="close-preview">&times;</button>
-        <div class="preview-content">
+    <!-- ===== Footer ===== -->
+    <div class="footer">
+        <span>by staccato</span>
+        <div class="team">东方隐侠安全团队</div>
+        <button id="clearCacheBtn" class="cache-clear-btn">清除缓存</button>
+    </div>
+
+    <!-- ===== Preview Modal ===== -->
+    <div id="iconPreview" class="modal-overlay">
+        <div class="modal">
+            <button class="close-btn">&times;</button>
             <h3>图标预览</h3>
             <img id="previewImage" src="" alt="图标预览">
-            <div class="icon-info">
+            <div class="meta">
                 <p id="previewDomain">example.com</p>
                 <p id="previewSize">尺寸: 未知</p>
                 <p id="previewMd5"></p>
                 <p id="previewFofa"></p>
             </div>
-            <button id="downloadPreviewBtn" class="btn btn-primary" style="margin-top: 15px;">
-                <i class="fas fa-download"></i> 下载图标
+            <button id="downloadPreviewBtn" class="modal-download">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                下载图标
             </button>
         </div>
     </div>
 
-    <!-- 外部脚本引用 -->
+    <script src="spark-md5.min.js"></script>
     <script src="popup.js"></script>
 </body>
 </html>
