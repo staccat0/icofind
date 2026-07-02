@@ -172,10 +172,21 @@ if (iconInfo) {
     chrome.storage.session.set({ [location.href]: iconInfo }).catch(() => {});
 }
 
+// 同时存储页面内容供关键词匹配使用
+const pageContent = (function() {
+    const html = document.documentElement ? document.documentElement.innerHTML : '';
+    const title = document.title || '';
+    return { body: html.substring(0, 200000), title: title };
+})();
+chrome.storage.session.set({ [location.href + '_page']: pageContent }).catch(() => {});
+
 // 监听来自弹出窗口的消息（作为 storage 读取失败的兜底）
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "getFavicon") {
         sendResponse(iconInfo);
+    }
+    if (request.action === "getPageContent") {
+        sendResponse(pageContent);
     }
     return true;
 });

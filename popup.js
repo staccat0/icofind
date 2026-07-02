@@ -30,6 +30,8 @@ async function getCurrentSiteInfo() {
                 _currentHashes = state.hashes;
                 _curIconIdx = state.curIdx;
                 restorePopupState(state);
+                // 缓存恢复后也尝试关键词匹配
+                await tryKeywordMatch(tab);
                 return;
             }
         } catch (e) {}
@@ -43,6 +45,7 @@ async function getCurrentSiteInfo() {
                 if (icons.length > 0 && icons[0].faviconUrl) {
                     _currentPageUrl = tab.url;
                     displayFavicon(icons);
+                    tryKeywordMatch(tab);
                     return;
                 }
             }
@@ -61,6 +64,7 @@ async function getCurrentSiteInfo() {
                 if (icons.length > 0 && icons[0].faviconUrl) {
                     _currentPageUrl = tab.url;
                     displayFavicon(icons);
+                    tryKeywordMatch(tab);
                     return;
                 }
             }
@@ -110,6 +114,10 @@ function restorePopupState(state) {
     if (icons.length > 1) {
         document.getElementById('iconPrev').classList.add('show');
         document.getElementById('iconNext').classList.add('show');
+    }
+
+    if (state.kwMatches && state.kwMatches.length > 0) {
+        renderKeywordMatches(state.kwMatches);
     }
 }
 
@@ -231,11 +239,37 @@ async function saveFingerprints(list) {
     await STORE.set({ fingerprints: list });
 }
 
-async function addFingerprint(type, hash, name) {
+async function addFingerprint(type, hash, name, extra) {
     const list = await getFingerprints();
-    list.push({ id: Date.now(), type, hash, name });
+
+    // 去重检查
+    const entry = { id: Date.now() };
+    let dupKey;
+    if (type === 'keyword') {
+        const kws = (extra.keywords || '').split(',').map(k => k.trim()).filter(k => k);
+        dupKey = 'keyword|' + kws.join(',');
+        if (list.some(f => f.method === 'keyword' && (f.keyword || []).join(',') === kws.join(','))) {
+            alert('该关键词指纹已存在');
+            return false;
+        }
+        entry.method = 'keyword';
+        entry.location = extra.location || 'body';
+        entry.keyword = kws;
+        entry.cms = name;
+    } else {
+        dupKey = type + '|' + hash;
+        if (list.some(f => !f.method && f.type === type && f.hash === hash)) {
+            alert('该 Hash 指纹已存在');
+            return false;
+        }
+        entry.type = type;
+        entry.hash = hash;
+        entry.name = name;
+    }
+    list.push(entry);
     await saveFingerprints(list);
     await renderFingerprints();
+    return true;
 }
 
 async function deleteFingerprint(id) {
@@ -243,6 +277,13 @@ async function deleteFingerprint(id) {
     await saveFingerprints(list);
     await renderFingerprints();
     await matchAllHashes(_currentHashes, _currentIcons);
+    // 重新进行关键词匹配
+    if (_currentPageUrl) {
+        try {
+            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            await tryKeywordMatch(tab);
+        } catch (e) {}
+    }
 }
 
 // 当前图标列表和哈希（用于指纹变更后重新匹配）
@@ -343,7 +384,8 @@ async function matchAllHashes(iconHashes, icons) {
                 icons: icons,
                 hashes: iconHashes,
                 curIdx: _curIconIdx,
-                matchedHTML: document.getElementById('site-match').innerHTML
+                matchedHTML: document.getElementById('site-match').innerHTML,
+                kwMatches: _currentKeywordMatches
             }
         }).catch(() => {});
     }
@@ -386,10 +428,152 @@ async function calculateAllHashes(icons) {
     await matchAllHashes(dedupHashes, dedupIcons);
 }
 
+// ===== 关键词匹配 =====
+let _currentKeywordMatches = [];
+
+// 获取关键词指纹
+async function getKeywordFingerprints() {
+    const all = await getFingerprints();
+    return all.filter(f => f.method === 'keyword');
+}
+
+// 对页面内容执行关键词匹配
+async function runKeywordMatch(pageContent) {
+    const loadingEl = document.getElementById('kwLoading');
+    if (loadingEl) loadingEl.style.display = 'inline';
+    const countEl = document.getElementById('kwMatchCount2');
+    if (countEl) countEl.textContent = '(0)';
+
+    const kwFps = await getKeywordFingerprints();
+    console.log('[icofind] 关键词指纹总数:', kwFps.length);
+
+    if (kwFps.length === 0 || !pageContent) {
+        if (loadingEl) loadingEl.style.display = 'none';
+        renderKeywordMatches([]);
+        return;
+    }
+
+    const matches = [];
+    for (const fp of kwFps) {
+        if (!fp.keyword || !Array.isArray(fp.keyword)) continue;
+        const kws = fp.keyword.filter(k => k);
+        if (kws.length === 0) continue;
+
+        let isMatch = false;
+
+        if (fp.location === 'title') {
+            // title 匹配：任一关键词命中
+            isMatch = kws.some(kw => pageContent.title.includes(kw));
+        } else if (fp.location === 'body') {
+            // body 匹配：所有关键词都要命中
+            isMatch = kws.every(kw => pageContent.body.includes(kw));
+        }
+        // header 暂不实现
+
+        if (isMatch) {
+            matches.push({ name: fp.cms || fp.name, location: fp.location });
+        }
+    }
+
+    _currentKeywordMatches = matches;
+    if (loadingEl) loadingEl.style.display = 'none';
+    console.log('[icofind] 匹配结果数:', matches.length, matches.slice(0, 3).map(m => m.name));
+    renderKeywordMatches(matches);
+}
+
+function renderKeywordMatches(matches) {
+    const container = document.getElementById('kwResultList');
+    const emptyEl = document.getElementById('kwEmpty');
+    const countEl = document.getElementById('kwMatchCount2');
+
+    if (!container) return;
+
+    // 去重：同一系统同一位置只显示一次
+    const dedup = [];
+    const seen = new Set();
+    for (const m of matches) {
+        const key = m.name + '|' + m.location;
+        if (!seen.has(key)) {
+            seen.add(key);
+            dedup.push(m);
+        }
+    }
+
+    if (countEl) countEl.textContent = '(' + dedup.length + ')';
+
+    if (dedup.length === 0) {
+        container.innerHTML = '<div class="kw-result-empty">暂无匹配</div>';
+        return;
+    }
+
+    if (emptyEl) emptyEl.style.display = 'none';
+
+    container.innerHTML = dedup.map(m =>
+        '<div class="kw-result-item">' +
+            '<span class="kw-dot"></span>' +
+            '<span class="kw-name" title="' + escapeHtml(m.name) + '">' + escapeHtml(m.name) + '</span>' +
+            '<span class="kw-loc-badge">' + (m.location === 'title' ? '标题' : '内容') + '</span>' +
+        '</div>'
+    ).join('');
+}
+
 function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+}
+
+// 尝试进行关键词匹配
+async function tryKeywordMatch(tab) {
+    // 更新关键词标签页的站点信息
+    const siteTitle = document.getElementById('site-title');
+    const siteUrl = document.getElementById('site-url');
+    const kwSiteTitle = document.getElementById('kwSiteTitle');
+    const kwSiteDomain = document.getElementById('kwSiteDomain');
+    if (kwSiteTitle && siteTitle) kwSiteTitle.textContent = siteTitle.textContent;
+    if (kwSiteDomain && siteUrl) kwSiteDomain.textContent = siteUrl.textContent;
+
+    try {
+        // 优先读 storage.session（content.js 写入）
+        let stored = await chrome.storage.session.get(tab.url + '_page');
+        let pageContent = stored && stored[tab.url + '_page'];
+
+        if (!pageContent) {
+            // 兜底1：sendMessage 
+            try {
+                pageContent = await new Promise(resolve => {
+                    chrome.tabs.sendMessage(tab.id, { action: "getPageContent" }, (resp) => {
+                        resolve(chrome.runtime.lastError ? null : resp);
+                    });
+                    setTimeout(() => resolve(null), 800);
+                });
+            } catch (e) { /* ignore */ }
+        }
+
+        if (!pageContent) {
+            // 兜底2：直接注入脚本获取页面内容（最可靠）
+            try {
+                const results = await chrome.scripting.executeScript({
+                    target: { tabId: tab.id },
+                    func: () => {
+                        const html = document.documentElement ? document.documentElement.innerHTML : '';
+                        return { body: html.substring(0, 200000), title: document.title || '' };
+                    }
+                });
+                if (results && results[0] && results[0].result) {
+                    pageContent = results[0].result;
+                }
+            } catch (e) { /* ignore */ }
+        }
+
+        console.log('[icofind] pageContent body长度:', pageContent ? pageContent.body.length : 'null', 'title:', pageContent ? pageContent.title : 'null');
+
+        if (pageContent && pageContent.body) {
+            await runKeywordMatch(pageContent);
+        } else {
+            console.log('[icofind] 未能获取页面内容');
+        }
+    } catch (e) { console.error('[icofind] tryKeywordMatch error:', e); }
 }
 
 // 更新来源和图标顺序显示
@@ -451,6 +635,10 @@ function displayFavicon(icons) {
         document.getElementById('previewMd5').textContent = '';
         document.getElementById('previewFofa').textContent = '';
         document.getElementById('site-match').innerHTML = '';
+        const kwList = document.getElementById('kwResultList');
+        const kwCount = document.getElementById('kwMatchCount2');
+        if (kwList) kwList.innerHTML = '<div class="kw-result-empty">暂无匹配</div>';
+        if (kwCount) kwCount.textContent = '(0)';
     }
 }
 
@@ -531,6 +719,10 @@ function showError(message) {
     document.getElementById('errorContainer').style.display = 'block';
     hideLoading();
     updateStatusIndicator('error');
+    const kwList = document.getElementById('kwResultList');
+    const kwCount = document.getElementById('kwMatchCount2');
+    if (kwList) kwList.innerHTML = '<div class="kw-result-empty">暂无匹配</div>';
+    if (kwCount) kwCount.textContent = '(0)';
 }
 
 function hideError() {
@@ -553,6 +745,11 @@ function showLoading() {
     _currentHashes = [];
     _curIconIdx = 0;
     _currentPageUrl = '';
+    _currentKeywordMatches = [];
+    const kwList = document.getElementById('kwResultList');
+    const kwCount = document.getElementById('kwMatchCount2');
+    if (kwList) kwList.innerHTML = '<div class="kw-result-empty">暂无匹配</div>';
+    if (kwCount) kwCount.textContent = '(0)';
 }
 
 // 更新状态指示器（使用 CSS class）
@@ -622,27 +819,155 @@ function copyToClipboard(text, btn) {
     });
 }
 
+// 渲染关键词指纹列表（关键词标签页专用）
+async function renderKwFingerprints() {
+    const list = await getKeywordFingerprints();
+    const container = document.getElementById('kwFpList');
+    const countEl = document.getElementById('kwFpCount');
+
+    if (countEl) countEl.textContent = '(' + list.length + ')';
+    if (!container) return;
+
+    if (list.length === 0) {
+        container.innerHTML = '<div class="fp-empty">暂无关键词指纹</div>';
+        return;
+    }
+
+    const display = list.slice(0, 50);
+    container.innerHTML = display.map(f => {
+        const loc = f.location === 'title' ? '标题' : '内容';
+        const kw = (f.keyword && Array.isArray(f.keyword)) ? f.keyword.slice(0, 2).join(',') : '';
+        const more = (f.keyword && f.keyword.length > 2) ? '...' : '';
+        return '<div class="fp-item">' +
+            '<span class="fp-type-badge keyword">kw</span>' +
+            '<span class="fp-item-hash">[' + loc + '] ' + escapeHtml(kw + more) + '</span>' +
+            '<span class="fp-item-name">' + escapeHtml(f.cms || f.name) + '</span>' +
+            '<button class="fp-delete" data-id="' + f.id + '">&times;</button>' +
+        '</div>';
+    }).join('');
+    if (list.length > 50) {
+        container.innerHTML += '<div class="fp-empty">...还有 ' + (list.length - 50) + ' 条</div>';
+    }
+}
+
+// 导出为统一格式
+function toExportFormat(list) {
+    return list.map(f => {
+        if (f.method === 'keyword') {
+            return {
+                cms: f.cms || f.name || '',
+                method: 'keyword',
+                location: f.location || 'body',
+                keyword: f.keyword || []
+            };
+        } else {
+            return {
+                cms: f.name || f.cms || '',
+                method: 'faviconhash',
+                location: 'body',
+                keyword: [f.hash || '']
+            };
+        }
+    });
+}
+
+// 统一导入处理：自动分拣 faviconhash/keyword/标准hash
+async function importUnified(items) {
+    const current = await getFingerprints();
+    const existingKeys = new Set(current.map(f => {
+        if (f.method === 'keyword') return 'keyword|' + (f.keyword || []).join(',');
+        return (f.type || '') + '|' + (f.hash || '');
+    }));
+    let added = 0;
+    let skipped = 0;
+
+    for (const item of items) {
+        // faviconhash/icon_hash → hash 指纹
+        if (item.method === 'faviconhash' || item.method === 'icon_hash') {
+            const hashes = item.keyword || [];
+            for (const h of hashes) {
+                const key = 'fofa|' + h;
+                if (!existingKeys.has(key)) {
+                    current.push({
+                        id: Date.now() + Math.random(),
+                        type: 'fofa',
+                        hash: h,
+                        name: item.cms || item.name
+                    });
+                    existingKeys.add(key);
+                    added++;
+                } else { skipped++; }
+            }
+            continue;
+        }
+
+        // keyword → 关键词指纹
+        if (item.method === 'keyword') {
+            if (!item.keyword || !Array.isArray(item.keyword) || item.keyword.length === 0) { skipped++; continue; }
+            const key = 'keyword|' + item.keyword.join(',');
+            if (!existingKeys.has(key)) {
+                current.push({
+                    id: Date.now() + Math.random(),
+                    method: 'keyword',
+                    location: item.location || 'body',
+                    keyword: item.keyword,
+                    cms: item.cms || item.name
+                });
+                existingKeys.add(key);
+                added++;
+            } else { skipped++; }
+            continue;
+        }
+
+        // 标准 hash 格式 {type, hash, name/cms}
+        const hash = item.hash;
+        const type = item.type || 'fofa';
+        const name = item.cms || item.name;
+        if (!hash || !type || !name) { skipped++; continue; }
+        const key = type + '|' + hash;
+        if (!existingKeys.has(key)) {
+            current.push({
+                id: Date.now() + Math.random(),
+                type: type,
+                hash: hash,
+                name: name
+            });
+            existingKeys.add(key);
+            added++;
+        } else { skipped++; }
+    }
+
+    await saveFingerprints(current);
+    return { added, skipped, total: current.length };
+}
+
 // 渲染指纹列表
 async function renderFingerprints() {
     const list = await getFingerprints();
+    // 图标哈希标签页只显示 hash 类型指纹
+    const hashList = list.filter(f => !f.method || f.method !== 'keyword');
     const container = document.getElementById('fpList');
     const countEl = document.getElementById('fpCount');
 
-    countEl.textContent = '(' + list.length + ')';
+    countEl.textContent = '(' + hashList.length + ')';
 
-    if (list.length === 0) {
+    if (hashList.length === 0) {
         container.innerHTML = '<div class="fp-empty">暂无指纹数据</div>';
         return;
     }
 
-    container.innerHTML = list.map(f =>
-        '<div class="fp-item">' +
-            '<span class="fp-type-badge ' + f.type + '">' + f.type + '</span>' +
-            '<span class="fp-item-hash" title="' + escapeHtml(f.hash) + '">' + escapeHtml(f.hash) + '</span>' +
-            '<span class="fp-item-name">' + escapeHtml(f.name) + '</span>' +
+    const display = hashList.slice(0, 50);
+    container.innerHTML = display.map(f => {
+        return '<div class="fp-item">' +
+            '<span class="fp-type-badge ' + (f.type || '') + '">' + (f.type || '') + '</span>' +
+            '<span class="fp-item-hash" title="' + escapeHtml(f.hash || '') + '">' + escapeHtml(f.hash) + '</span>' +
+            '<span class="fp-item-name">' + escapeHtml(f.name || '') + '</span>' +
             '<button class="fp-delete" data-id="' + f.id + '">&times;</button>' +
-        '</div>'
-    ).join('');
+        '</div>';
+    }).join('');
+    if (hashList.length > 50) {
+        container.innerHTML += '<div class="fp-empty">...还有 ' + (hashList.length - 50) + ' 条</div>';
+    }
 }
 
 // 初始化事件监听器
@@ -710,15 +1035,13 @@ function initEventListeners() {
         document.querySelector('.fp-manager').classList.toggle('open');
     });
 
-    // 添加指纹
+    // 添加指纹（hash 类型）
     document.getElementById('fpAddBtn').addEventListener('click', async () => {
         const type = document.getElementById('fpType').value;
-        const hash = document.getElementById('fpHash').value.trim();
         const name = document.getElementById('fpName').value.trim();
-        if (!hash || !name) {
-            alert('请填写 Hash 值和系统名称');
-            return;
-        }
+        const hash = document.getElementById('fpHash').value.trim();
+        if (!name) { alert('请填写系统名称'); return; }
+        if (!hash) { alert('请填写 Hash 值'); return; }
         await addFingerprint(type, hash, name);
         document.getElementById('fpHash').value = '';
         document.getElementById('fpName').value = '';
@@ -733,19 +1056,20 @@ function initEventListeners() {
         }
     });
 
-    // 导出指纹
+    // 导出指纹（统一 统一格式）
     document.getElementById('fpExportBtn').addEventListener('click', async () => {
         const list = await getFingerprints();
         if (list.length === 0) {
             alert('指纹库为空，无需导出');
             return;
         }
-        const json = JSON.stringify(list, null, 2);
+        const output = toExportFormat(list);
+        const json = JSON.stringify({ fingerprint: output }, null, 2);
         const blob = new Blob([json], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'icofind_fingerprints.json';
+        a.download = 'finger.json';
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -762,29 +1086,24 @@ function initEventListeners() {
         if (!file) return;
         try {
             const text = await file.text();
-            const imported = JSON.parse(text);
-            if (!Array.isArray(imported)) throw new Error('格式错误');
-            
-            const current = await getFingerprints();
-            const existingKeys = new Set(current.map(f => f.type + '|' + f.hash));
-            let added = 0;
-            for (const item of imported) {
-                if (!item.type || !item.hash || !item.name) continue;
-                const key = item.type + '|' + item.hash;
-                if (!existingKeys.has(key)) {
-                    current.push({ id: Date.now() + Math.random(), type: item.type, hash: item.hash, name: item.name });
-                    existingKeys.add(key);
-                    added++;
-                }
-            }
-            await saveFingerprints(current);
+            if (!text || text.length < 10) throw new Error('文件为空或过小');
+
+            let data;
+            try { data = JSON.parse(text); } catch (jsonErr) { throw new Error('JSON解析失败: ' + jsonErr.message); }
+            if (!Array.isArray(data) && data.fingerprint) data = data.fingerprint;
+            if (!Array.isArray(data)) throw new Error('不支持的文件格式，请使用数组或 {fingerprint:[...]} 格式');
+
+            const result = await importUnified(data);
             await renderFingerprints();
-            
+            await renderKwFingerprints();
             await matchAllHashes(_currentHashes, _currentIcons);
-            
-            alert('导入完成，新增 ' + added + ' 条指纹');
+            if (_currentPageUrl) {
+                const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+                if (tab) await tryKeywordMatch(tab);
+            }
+            alert('导入完成：新增 ' + result.added + ' 条，跳过 ' + result.skipped + ' 条重复');
         } catch (err) {
-            alert('导入失败：文件格式不正确');
+            alert('导入失败：' + (err.message || '未知错误'));
         }
         e.target.value = '';
     });
@@ -819,7 +1138,96 @@ function initEventListeners() {
         _currentHashes = [];
         _curIconIdx = 0;
         _currentPageUrl = '';
+        _currentKeywordMatches = [];
+        const kwList = document.getElementById('kwResultList');
+        const kwCount = document.getElementById('kwMatchCount2');
+        if (kwList) kwList.innerHTML = '<div class="kw-result-empty">暂无匹配</div>';
+        if (kwCount) kwCount.textContent = '(0)';
         getCurrentSiteInfo();
+    });
+
+    // ===== 关键词标签页事件 =====
+    // 刷新匹配
+    document.getElementById('kwRefreshBtn').addEventListener('click', async () => {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tab) await tryKeywordMatch(tab);
+    });
+
+    // 关键词指纹管理折叠
+    document.getElementById('kwQuickToggle').addEventListener('click', () => {
+        document.querySelector('.kw-quick-add').classList.toggle('open');
+    });
+
+    // 添加关键词指纹
+    document.getElementById('kwFpAddBtn').addEventListener('click', async () => {
+        const location = document.getElementById('kwFpLocation').value;
+        const keywords = document.getElementById('kwFpKeywords').value.trim();
+        const name = document.getElementById('kwFpName').value.trim();
+        if (!keywords || !name) { alert('请填写关键词和系统名称'); return; }
+        await addFingerprint('keyword', '', name, { location, keywords });
+        document.getElementById('kwFpKeywords').value = '';
+        document.getElementById('kwFpName').value = '';
+        await renderKwFingerprints();
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tab) await tryKeywordMatch(tab);
+    });
+
+    // 关键词指纹列表删除
+    document.getElementById('kwFpList').addEventListener('click', async (e) => {
+        if (e.target.classList.contains('fp-delete')) {
+            const id = parseInt(e.target.dataset.id);
+            if (id) {
+                await deleteFingerprint(id);
+                await renderKwFingerprints();
+            }
+        }
+    });
+
+    // 导出（统一 统一格式，导出全部指纹）
+    document.getElementById('kwExportBtn').addEventListener('click', async () => {
+        const all = await getFingerprints();
+        if (all.length === 0) { alert('指纹库为空'); return; }
+        const output = toExportFormat(all);
+        const json = JSON.stringify({ fingerprint: output }, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'finger.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    });
+
+    // 导入关键词指纹
+    document.getElementById('kwImportBtn').addEventListener('click', () => {
+        document.getElementById('kwFileInput').click();
+    });
+
+    document.getElementById('kwFileInput').addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        try {
+            const text = await file.text();
+            if (!text || text.length < 10) throw new Error('文件为空或过小');
+
+            let data;
+            try { data = JSON.parse(text); } catch (jsonErr) { throw new Error('JSON解析失败: ' + jsonErr.message); }
+            if (!Array.isArray(data) && data.fingerprint) data = data.fingerprint;
+            if (!Array.isArray(data)) throw new Error('不支持的文件格式，请使用数组或 {fingerprint:[...]} 格式');
+
+            const result = await importUnified(data);
+            await renderKwFingerprints();
+            await renderFingerprints();
+            await matchAllHashes(_currentHashes, _currentIcons);
+            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            if (tab) await tryKeywordMatch(tab);
+            alert('导入完成：新增 ' + result.added + ' 条，跳过 ' + result.skipped + ' 条重复');
+        } catch (err) {
+            alert('导入失败：' + (err.message || '未知错误'));
+        }
+        e.target.value = '';
     });
 
     // 自定义 URL 计算
@@ -889,10 +1297,23 @@ function initEventListeners() {
 // 初始化
 document.addEventListener('DOMContentLoaded', async () => {
     initEventListeners();
+
+    // 标签页切换
+    document.querySelectorAll('.nav-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            const targetTab = this.getAttribute('data-tab');
+            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.getElementById('tab-' + targetTab).classList.add('active');
+        });
+    });
+
     getCurrentSiteInfo();
     
     const data = await STORE.get('iconHistory');
     renderHistory(data.iconHistory || []);
 
     await renderFingerprints();
+    await renderKwFingerprints();
 });
