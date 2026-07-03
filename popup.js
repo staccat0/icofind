@@ -467,17 +467,28 @@ async function runKeywordMatch(pageContent) {
         } else if (fp.location === 'body') {
             // body 匹配：所有关键词都要命中
             isMatch = kws.every(kw => pageContent.body.includes(kw));
+        } else if (fp.location === 'header') {
+            // header 匹配：将响应头拼成原始文本，检查关键词是否出现在其中
+            const headers = pageContent.headers || {};
+            const rawHeaders = Object.entries(headers)
+                .map(([k, v]) => k + ': ' + v)
+                .join('\n')
+                .toLowerCase();
+            isMatch = kws.every(kw => rawHeaders.includes(kw.toLowerCase()));
         }
-        // header 暂不实现
 
         if (isMatch) {
-            matches.push({ name: fp.cms || fp.name, location: fp.location });
+            matches.push({ name: fp.cms || fp.name, location: fp.location, keywords: kws });
         }
     }
 
     _currentKeywordMatches = matches;
     if (loadingEl) loadingEl.style.display = 'none';
-    console.log('[icofind] 匹配结果数:', matches.length, matches.slice(0, 3).map(m => m.name));
+    console.log('[icofind] 匹配结果数:', matches.length);
+    // 按 location 分类输出，方便排查 header 匹配是否准确
+    const byLoc = {};
+    matches.forEach(m => { const k = m.location || 'unknown'; if (!byLoc[k]) byLoc[k] = []; byLoc[k].push({ name: m.name, kw: m.keywords }); });
+    console.log('[icofind] 匹配明细:', JSON.stringify(byLoc));
     renderKeywordMatches(matches);
 }
 
@@ -512,7 +523,7 @@ function renderKeywordMatches(matches) {
         '<div class="kw-result-item">' +
             '<span class="kw-dot"></span>' +
             '<span class="kw-name" title="' + escapeHtml(m.name) + '">' + escapeHtml(m.name) + '</span>' +
-            '<span class="kw-loc-badge">' + (m.location === 'title' ? '标题' : '内容') + '</span>' +
+            '<span class="kw-loc-badge">' + (m.location === 'title' ? '标题' : m.location === 'header' ? '响应头' : '内容') + '</span>' +
         '</div>'
     ).join('');
 }
@@ -566,10 +577,22 @@ async function tryKeywordMatch(tab) {
             } catch (e) { /* ignore */ }
         }
 
-        console.log('[icofind] pageContent body长度:', pageContent ? pageContent.body.length : 'null', 'title:', pageContent ? pageContent.title : 'null');
+        // 获取响应头（从 background.js 通过 webRequest 捕获的原始响应头）
+        let headers = {};
+        try {
+            const stored = await chrome.storage.session.get(tab.url + '_headers');
+            if (stored && stored[tab.url + '_headers']) {
+                headers = stored[tab.url + '_headers'];
+            }
+        } catch (e) {}
+
+        console.log('[icofind] pageContent body长度:', pageContent ? pageContent.body.length : 'null', 'title:', pageContent ? pageContent.title : 'null', 'headers:', Object.keys(headers).length, 'headerKeys:', Object.keys(headers).join(','));
 
         if (pageContent && pageContent.body) {
-            await runKeywordMatch(pageContent);
+            await runKeywordMatch({ body: pageContent.body, title: pageContent.title, headers });
+        } else if (Object.keys(headers).length > 0) {
+            // 没有页面内容但有响应头，也可以做 header 匹配
+            await runKeywordMatch({ body: '', title: '', headers });
         } else {
             console.log('[icofind] 未能获取页面内容');
         }
@@ -835,7 +858,7 @@ async function renderKwFingerprints() {
 
     const display = list.slice(0, 50);
     container.innerHTML = display.map(f => {
-        const loc = f.location === 'title' ? '标题' : '内容';
+        const loc = f.location === 'title' ? '标题' : f.location === 'header' ? '响应头' : '内容';
         const kw = (f.keyword && Array.isArray(f.keyword)) ? f.keyword.slice(0, 2).join(',') : '';
         const more = (f.keyword && f.keyword.length > 2) ? '...' : '';
         return '<div class="fp-item">' +

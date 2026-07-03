@@ -4,8 +4,12 @@
   "name": "icofind",
   "version": "1.4",
   "description": "提取当前站点ico图标，生成ico hash值",
-  "permissions": ["activeTab", "scripting", "storage"],
+  "permissions": ["activeTab", "scripting", "storage", "webRequest"],
   "host_permissions": ["<all_urls>"],
+
+  "background": {
+    "service_worker": "background.js"
+  },
 
   "icons": {
     "16": "icons/logo.png",
